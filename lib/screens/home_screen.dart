@@ -3,11 +3,12 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:share_plus/share_plus.dart'; // <--- IMPORTANTE PARA EL ERROR DE XFILE
+
 import '../providers/product_provider.dart';
 import '../database/database_helper.dart';
-import '../models/producto.dart';
 import 'add_edit_product_screen.dart';
+import 'checkout_screen.dart'; // <--- IMPORTANTE PARA EL ERROR DE CHECKOUTSCREEN
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -143,11 +144,56 @@ class _HomeScreenState extends State<HomeScreen> {
     return Drawer(
       child: ListView(
         children: [
-          const DrawerHeader(decoration: BoxDecoration(color: Colors.green), child: Center(child: Text("Mi Tienda", style: TextStyle(color: Colors.white, fontSize: 24)))),
-          ListTile(leading: const Icon(Icons.share), title: const Text("Exportar CSV"), onTap: () async { Navigator.pop(context); String path = await context.read<ProductProvider>().exportToCSV(); Share.shareXFiles([XFile(path)]); }),
-          ListTile(leading: const Icon(Icons.file_upload), title: const Text("Importar CSV"), onTap: () async { Navigator.pop(context); await context.read<ProductProvider>().importFromCSV(); }),
+          const DrawerHeader(
+            decoration: BoxDecoration(color: Colors.green),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(Icons.store, color: Colors.white, size: 50),
+                Text("Mi Tienda", style: TextStyle(color: Colors.white, fontSize: 24)),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.calculate, color: Colors.blue), 
+            title: const Text("CAJA / VENDER", style: TextStyle(fontWeight: FontWeight.bold)), 
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen()));
+            }
+          ),
+          ListTile(
+            leading: const Icon(Icons.share), 
+            title: const Text("Exportar CSV"), 
+            onTap: () async {
+              Navigator.pop(context);
+              String path = await context.read<ProductProvider>().exportToCSV();
+              Share.shareXFiles([XFile(path)], text: 'Lista de precios.');
+            }
+          ),
+          ListTile(
+            leading: const Icon(Icons.file_upload), 
+            title: const Text("Importar CSV"), 
+            onTap: () async {
+              Navigator.pop(context);
+              await context.read<ProductProvider>().importFromCSV();
+            }
+          ),
           const Divider(),
-          ListTile(leading: const Icon(Icons.delete_sweep, color: Colors.red), title: const Text("Vaciar Tienda", style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); AwesomeDialog(context: context, dialogType: DialogType.warning, title: '¿BORRAR TODO?', btnOkOnPress: () => context.read<ProductProvider>().clearAll()).show(); }),
+          ListTile(
+            leading: const Icon(Icons.delete_sweep, color: Colors.red),
+            title: const Text("VACIAR TIENDA", style: TextStyle(color: Colors.red)),
+            onTap: () {
+              Navigator.pop(context);
+              AwesomeDialog(
+                context: context,
+                dialogType: DialogType.warning,
+                title: '¿BORRAR TODO?',
+                btnOkOnPress: () => context.read<ProductProvider>().clearAll(),
+              ).show();
+            },
+          ),
         ],
       ),
     );
