@@ -1,0 +1,29 @@
+# Archivos de Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Archivos de Android
+.gradle/
+local.properties
+**/project.xcworkspace/
+**/xcuserdata/
+**/Pods/
+**/*.apk
+**/*.aab
+**/*.keystore
+
+# Archivos de VS Code
+.vscode/
+*.code-workspace
+
+# Archivos de Sistema
+.DS_Store
+Thumbs.db
+
+# Excepción: Queremos que el APK final NO se ignore si lo vas a subir a mano, 
+# pero Git por defecto ignora toda la carpeta build/.
