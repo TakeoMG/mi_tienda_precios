@@ -1,14 +1,21 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import '../database/database_helper.dart';
 import '../models/producto.dart';
-import 'package:file_picker/file_picker.dart';
 
 class ProductProvider with ChangeNotifier {
   List<Producto> _items = [];
   List<Producto> _filteredItems = [];
   bool _isLoading = false;
+
+  // --- LÓGICA DE SELECCIÓN ---
+  final Set<int> _selectedIds = {}; 
+  Set<int> get selectedIds => _selectedIds;
+  bool get isSelectionMode => _selectedIds.isNotEmpty;
 
   List<Producto> get items => _filteredItems;
   bool get isLoading => _isLoading;
@@ -41,6 +48,37 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // --- MÉTODOS DE SELECCIÓN ---
+  void toggleSelection(int id) {
+    if (_selectedIds.contains(id)) {
+      _selectedIds.remove(id);
+    } else {
+      _selectedIds.add(id);
+    }
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    _selectedIds.clear();
+    notifyListeners();
+  }
+
+  void selectAllFiltered() {
+    for (var p in _filteredItems) {
+      if (p.id != null) _selectedIds.add(p.id!);
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteSelected() async {
+    for (var id in _selectedIds) {
+      await DatabaseHelper.instance.delete(id);
+    }
+    _selectedIds.clear();
+    await fetchProductos();
+  }
+
+  // --- CRUD BÁSICO ---
   Future<void> addProducto(Producto producto) async {
     await DatabaseHelper.instance.create(producto);
     await fetchProductos();
@@ -55,78 +93,65 @@ class ProductProvider with ChangeNotifier {
     await DatabaseHelper.instance.delete(id);
     await fetchProductos();
   }
-Future<String> exportToCSV() async {
-    // Creamos el encabezado del archivo
+
+  Future<void> clearAll() async {
+    await DatabaseHelper.instance.deleteAll();
+    await fetchProductos();
+  }
+
+  // --- IMPORTAR / EXPORTAR ---
+  Future<String> exportToCSV() async {
     String csvData = "Nombre,Precio,Categoria,Descripcion\n";
-    
-    // Recorremos los productos y los añadimos como filas
     for (var p in _items) {
-      // Limpiamos comas de los textos para no romper el formato CSV
-      String nombre = p.nombre.replaceAll(',', ' ');
-      String categoria = p.categoria.replaceAll(',', ' ');
-      String desc = (p.descripcion ?? "").replaceAll(',', ' ');
-      
-      csvData += "$nombre,${p.precio},$categoria,$desc\n";
+      csvData += "${p.nombre},${p.precio},${p.categoria},${p.descripcion ?? ''}\n";
     }
-    
-    // Guardamos el archivo en el celular
-    final directory = await getExternalStorageDirectory();
-    final file = File('${directory!.path}/productos_tienda.csv');
-    await file.writeAsString(csvData);
-    
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/productos_tienda.csv');
+    await file.writeAsString(csvData, encoding: utf8);
     return file.path;
   }
 
-
-
   Future<bool> importFromCSV() async {
     try {
-      // 1. Abrir el selector de archivos
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-
+      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
       if (result != null) {
         File file = File(result.files.single.path!);
-        String content = await file.readAsString();
+        String content;
+        try {
+          content = await file.readAsString(encoding: utf8);
+        } catch (e) {
+          content = await file.readAsString(encoding: latin1);
+        }
         
-        // 2. Procesar las líneas
         List<String> lines = content.split('\n');
-        
-        // Empezamos en 1 para saltar el encabezado (Nombre, Precio...)
         for (int i = 1; i < lines.length; i++) {
           if (lines[i].trim().isEmpty) continue;
-          
           List<String> columns = lines[i].split(',');
           if (columns.length >= 3) {
-            String nombre = columns[0].trim();
-            double precio = double.tryParse(columns[1].trim()) ?? 0.0;
-            String categoria = columns[2].trim();
-            String desc = columns.length > 3 ? columns[3].trim() : "";
-
-            // 3. Crear el producto
             Producto nuevo = Producto(
-              nombre: nombre,
-              precio: precio,
-              categoria: categoria,
-              descripcion: desc,
+              nombre: columns[0].trim(),
+              precio: double.tryParse(columns[1].trim()) ?? 0.0,
+              categoria: columns[2].trim(),
+              descripcion: columns.length > 3 ? columns[3].trim() : "",
               fechaCreacion: DateTime.now(),
             );
-
-            // 4. Guardar en DB (puedes mejorar esto verificando si ya existe por nombre)
-            await DatabaseHelper.instance.create(nuevo);
+            
+            Producto? existe = await DatabaseHelper.instance.getProductoByNombre(nuevo.nombre);
+            if (existe != null) {
+              nuevo.id = existe.id;
+              await DatabaseHelper.instance.update(nuevo);
+            } else {
+              await DatabaseHelper.instance.create(nuevo);
+            }
           }
         }
-        await fetchProductos(); // Refrescar lista
+        await fetchProductos();
         return true;
       }
       return false;
     } catch (e) {
-      debugPrint("Error importando: $e");
+      debugPrint("Error: $e");
       return false;
     }
   }
-
-
 }

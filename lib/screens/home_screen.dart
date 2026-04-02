@@ -4,18 +4,20 @@ import 'package:provider/provider.dart';
 import '../providers/product_provider.dart';
 import 'add_edit_product_screen.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-import 'package:share_plus/share_plus.dart'; // <--- Agrega esto arriba
+import 'package:share_plus/share_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final fCurrency = NumberFormat.simpleCurrency(locale: "es_MX"); // Cambia según tu país
+  
+  // 1. FORMATO DE PESOS: Símbolo al inicio y sin decimales (.00)
+  final fCurrency = NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0);
 
   @override
   void initState() {
@@ -26,24 +28,43 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
+    final isSelected = productProvider.isSelectionMode;
+    final theme = Theme.of(context); // Para detectar colores de modo oscuro automáticamente
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('My Market'),
+        title: Text(isSelected 
+          ? "${productProvider.selectedIds.length} seleccionados" 
+          : 'Mi Tienda - Precios'),
+        // 3. COLOR ADAPTABLE: Usa el contenedor del tema para modo oscuro
+        backgroundColor: isSelected ? theme.colorScheme.primaryContainer : null,
+        leading: isSelected 
+          ? IconButton(icon: const Icon(Icons.close), onPressed: () => productProvider.clearSelection())
+          : null,
         actions: [
-          PopupMenuButton(
-            icon: Icon(Icons.sort),
-            onSelected: (value) {
-              productProvider.sortByPrice(value == 'asc');
-            },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'asc', child: Text('Precio: Menor a Mayor')),
-              PopupMenuItem(value: 'desc', child: Text('Precio: Mayor a Menor')),
-            ],
-          )
+          if (isSelected) ...[
+            IconButton(
+              icon: const Icon(Icons.select_all), 
+              onPressed: () => productProvider.selectAllFiltered(),
+              tooltip: "Seleccionar todos",
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red), 
+              onPressed: () => _confirmDeleteSelected(context),
+            ),
+          ] else ...[
+            PopupMenuButton(
+              icon: const Icon(Icons.sort),
+              onSelected: (val) => productProvider.sortByPrice(val == 'asc'),
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(value: 'asc', child: Text('Precio: Menor a Mayor')),
+                const PopupMenuItem(value: 'desc', child: Text('Precio: Mayor a Menor')),
+              ],
+            )
+          ]
         ],
       ),
-      drawer: _buildDrawer(context),
+      drawer: isSelected ? null : _buildDrawer(context),
       body: Column(
         children: [
           Padding(
@@ -51,87 +72,96 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SearchBar(
               controller: _searchController,
               hintText: "Buscar producto o categoría...",
-              leading: Icon(Icons.search),
+              leading: const Icon(Icons.search),
               onChanged: (val) => productProvider.search(val),
             ),
           ),
           Expanded(
-            child: productProvider.isLoading
-                ? Center(child: CircularProgressIndicator())
-                : productProvider.items.isEmpty
-                    ? Center(child: Text("No se encontraron productos"))
-                    : ListView.builder(
-                        itemCount: productProvider.items.length,
-                        itemBuilder: (ctx, i) {
-                          final p = productProvider.items[i];
-                          return Card(
-                            margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            child: ListTile(
-                              title: Text(p.nombre, style: TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(p.categoria),
-                              trailing: Text(fCurrency.format(p.precio), 
-                                style: TextStyle(color: Colors.green, fontSize: 18, fontWeight: FontWeight.bold)),
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => AddEditProductScreen(producto: p))),
-                              onLongPress: () => _confirmDelete(context, p),
-                            ),
-                          );
-                        },
-                      ),
+            child: productProvider.isLoading 
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+              itemCount: productProvider.items.length,
+              itemBuilder: (ctx, i) {
+                final p = productProvider.items[i];
+                final isItemSelection = productProvider.selectedIds.contains(p.id);
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  // 3. CONTRASTE: Usamos secondaryContainer para que resalte en oscuro y claro
+                  color: isItemSelection ? theme.colorScheme.secondaryContainer : null,
+                  elevation: isItemSelection ? 4 : 1,
+                  child: ListTile(
+                    // 2. SIN CÍRCULO: Solo mostramos checkbox si hay selección múltiple
+                    leading: isSelected 
+                      ? Checkbox(
+                          value: isItemSelection, 
+                          activeColor: theme.colorScheme.primary,
+                          onChanged: (_) => productProvider.toggleSelection(p.id!))
+                      : null,
+                    title: Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(p.categoria),
+                    trailing: Text(fCurrency.format(p.precio), 
+                      style: const TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      if (isSelected) {
+                        productProvider.toggleSelection(p.id!);
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => AddEditProductScreen(producto: p)));
+                      }
+                    },
+                    onLongPress: () => productProvider.toggleSelection(p.id!),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddEditProductScreen())),
-        label: Text("Nuevo Producto"),
-        icon: Icon(Icons.add),
+      floatingActionButton: isSelected ? null : FloatingActionButton.extended(
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditProductScreen())),
+        label: const Text("Nuevo Producto"),
+        icon: const Icon(Icons.add),
       ),
     );
   }
 
-  void _confirmDelete(BuildContext context, dynamic p) {
+  void _confirmDeleteSelected(BuildContext context) {
     AwesomeDialog(
       context: context,
       dialogType: DialogType.question,
-      title: '¿Eliminar?',
-      desc: '¿Estás seguro de eliminar ${p.nombre}?',
-      btnCancelText: "Cancelar",
-      btnOkText: "Eliminar",
-      btnOkOnPress: () => context.read<ProductProvider>().deleteProducto(p.id!),
+      title: '¿Eliminar seleccionados?',
+      desc: 'Borrarás ${context.read<ProductProvider>().selectedIds.length} productos.',
+      btnCancelText: "No",
+      btnOkText: "Sí, borrar",
+      btnOkColor: Colors.red,
+      btnOkOnPress: () => context.read<ProductProvider>().deleteSelected(),
     ).show();
   }
 
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: BoxDecoration(color: Colors.green),
-            child: Column(
+            decoration: const BoxDecoration(color: Colors.green),
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Icon(Icons.store, color: Colors.white, size: 50),
-                Text("My Market", style: TextStyle(color: Colors.white, fontSize: 24)),
+                Text("Mi Tienda", style: TextStyle(color: Colors.white, fontSize: 24)),
               ],
             ),
           ),
-          ListTile(leading: Icon(Icons.home), title: Text("Inicio"), onTap: () => Navigator.pop(context)),
           ListTile(
             leading: const Icon(Icons.share), 
             title: const Text("Exportar y Enviar"), 
             onTap: () async {
-              Navigator.pop(context); // Cierra el menú
-              
-              // 1. Generamos el archivo (esto ya lo tenemos en el provider)
+              Navigator.pop(context);
               String filePath = await context.read<ProductProvider>().exportToCSV();
-              
-              // 2. Abrimos la ventana de compartir de Android
-              // Esto te permitirá enviarlo por WhatsApp o guardarlo donde quieras
-              await Share.shareXFiles(
-                [XFile(filePath)], 
-                text: 'Aquí tienes la lista de precios de mi tienda.',
-              );
+              Share.shareXFiles([XFile(filePath)], text: 'Precios de mi tienda.');
             }
           ),
           ListTile(
@@ -141,20 +171,27 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
               bool ok = await context.read<ProductProvider>().importFromCSV();
               if (ok) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("¡Productos importados con éxito!"), backgroundColor: Colors.green),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("¡Importado!"), backgroundColor: Colors.green));
               }
             }
           ),
-          AboutListTile(
-            icon: Icon(Icons.info),
-            applicationName: "My Market",
-            applicationVersion: "1.0.0",
-            aboutBoxChildren: [Text("Creado para control de precios local.")],
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.delete_sweep, color: Colors.red),
+            title: const Text("VACIAR TIENDA", style: TextStyle(color: Colors.red)),
+            onTap: () {
+              Navigator.pop(context);
+              AwesomeDialog(
+                context: context,
+                dialogType: DialogType.warning,
+                title: '¿BORRAR TODO?',
+                desc: 'Esta acción limpiará toda la base de datos.',
+                btnOkOnPress: () => context.read<ProductProvider>().clearAll(),
+              ).show();
+            },
           ),
         ],
       ),
     );
   }
-}
+} 

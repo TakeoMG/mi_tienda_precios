@@ -67,4 +67,33 @@ class DatabaseHelper {
       whereArgs: [id],
     );
   }
+  // Busca si un producto ya existe por su nombre
+  Future<Producto?> getProductoByNombre(String nombre) async {
+    final db = await instance.database;
+    final maps = await db.query(
+      'productos',
+      where: 'nombre = ?',
+      whereArgs: [nombre.trim()],
+    );
+
+    if (maps.isNotEmpty) {
+      return Producto.fromMap(maps.first);
+    }
+    return null;
+  }
+  // Borra ABSOLUTAMENTE TODO
+  Future<int> deleteAll() async {
+    final db = await instance.database;
+    return await db.delete('productos');
+  }
+
+  // Borra todos los productos de una categoría específica
+  Future<int> deleteByCategory(String categoria) async {
+    final db = await instance.database;
+    return await db.delete(
+      'productos',
+      where: 'categoria = ?',
+      whereArgs: [categoria],
+    );
+  }
 }
