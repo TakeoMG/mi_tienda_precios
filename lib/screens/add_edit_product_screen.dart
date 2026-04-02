@@ -5,7 +5,9 @@ import '../providers/product_provider.dart';
 
 class AddEditProductScreen extends StatefulWidget {
   final Producto? producto;
-  const AddEditProductScreen({super.key, this.producto});
+  final String? nuevoCodigo;
+
+  const AddEditProductScreen({super.key, this.producto, this.nuevoCodigo});
 
   @override
   State<AddEditProductScreen> createState() => _AddEditProductScreenState();
@@ -13,17 +15,31 @@ class AddEditProductScreen extends StatefulWidget {
 
 class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _formKey = GlobalKey<FormState>();
-  late String _nombre, _categoria, _descripcion;
-  late double _precio;
   
-  // VARIABLE CLAVE: Controla si se puede editar o no
-  late bool _bloqueado; 
+  // Variables inicializadas para evitar errores de "Late Initialization"
+  String _nombre = '';
+  String _categoria = '';
+  String _descripcion = '';
+  double _precio = 0.0;
+  String? _codigoBarras;
+  late bool _bloqueado;
 
   @override
   void initState() {
     super.initState();
-    // Si el producto existe, empezamos bloqueados. Si es nuevo, empezamos editando.
     _bloqueado = widget.producto != null;
+    
+    // Si estamos editando, cargamos los valores actuales
+    if (widget.producto != null) {
+      _nombre = widget.producto!.nombre;
+      _categoria = widget.producto!.categoria;
+      _descripcion = widget.producto!.descripcion ?? '';
+      _precio = widget.producto!.precio;
+      _codigoBarras = widget.producto!.codigoBarras;
+    } else if (widget.nuevoCodigo != null) {
+      // Si venimos del escáner con un código nuevo
+      _codigoBarras = widget.nuevoCodigo;
+    }
   }
 
   @override
@@ -34,9 +50,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         actions: [
           if (widget.producto != null)
             IconButton(
-              icon: Icon(_bloqueado ? Icons.edit : Icons.edit_off, color: _bloqueado ? Colors.green : Colors.orange),
+              icon: Icon(_bloqueado ? Icons.edit : Icons.edit_off, 
+                color: _bloqueado ? Colors.green : Colors.orange),
               onPressed: () => setState(() => _bloqueado = !_bloqueado),
-              tooltip: "Habilitar edición",
             )
         ],
       ),
@@ -49,56 +65,92 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               children: [
                 if (_bloqueado) 
                   Card(
-                    color: Colors.yellow[100], // Este color SÍ existe
+                    color: Colors.yellow[100], 
                     child: const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Text(
-                        "Modo lectura: Toca el lápiz arriba para editar", 
-                        style: TextStyle(fontSize: 12, color: Colors.black87)
-                      ),
-                    ),
+                      padding: EdgeInsets.all(8.0), 
+                      child: Text("Modo lectura: Toca el lápiz para editar", 
+                        style: TextStyle(fontSize: 12, color: Colors.black87))
+                    )
                   ),
+                const SizedBox(height: 10),
+                
+                // NOMBRE
                 TextFormField(
-                  initialValue: widget.producto?.nombre,
-                  readOnly: _bloqueado, // <--- Bloqueo
-                  decoration: const InputDecoration(labelText: "Nombre *", border: OutlineInputBorder()),
-                  validator: (v) => v!.isEmpty ? "Campo obligatorio" : null,
-                  onSaved: (v) => _nombre = v!,
+                  initialValue: _nombre,
+                  readOnly: _bloqueado,
+                  decoration: const InputDecoration(labelText: "Nombre del Producto *", border: OutlineInputBorder()),
+                  validator: (v) => v == null || v.isEmpty ? "El nombre es obligatorio" : null,
+                  onChanged: (v) => _nombre = v,
                 ),
                 const SizedBox(height: 15),
+
+                // CÓDIGO DE BARRAS
                 TextFormField(
-                  initialValue: widget.producto?.precio.toString(),
-                  readOnly: _bloqueado, // <--- Bloqueo
-                  decoration: const InputDecoration(labelText: "Precio *", border: OutlineInputBorder(), prefixText: "\$ "),
+                  initialValue: _codigoBarras,
+                  readOnly: _bloqueado,
+                  decoration: const InputDecoration(
+                    labelText: "Código de Barras (Opcional)", 
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.qr_code)
+                  ),
+                  onChanged: (v) => _codigoBarras = v,
+                ),
+                const SizedBox(height: 15),
+
+                // PRECIO
+                TextFormField(
+                  initialValue: widget.producto != null ? _precio.toString() : "",
+                  readOnly: _bloqueado,
+                  decoration: const InputDecoration(
+                    labelText: "Precio *", 
+                    border: OutlineInputBorder(), 
+                    prefixText: "\$ "
+                  ),
                   keyboardType: TextInputType.number,
-                  validator: (v) => (double.tryParse(v!) ?? 0) <= 0 ? "Precio inválido" : null,
-                  onSaved: (v) => _precio = double.parse(v!),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return "El precio es obligatorio";
+                    if (double.tryParse(v) == null || double.parse(v) <= 0) return "Precio inválido";
+                    return null;
+                  },
+                  onChanged: (v) => _precio = double.tryParse(v) ?? 0.0,
                 ),
                 const SizedBox(height: 15),
+
+                // CATEGORÍA
                 TextFormField(
-                  initialValue: widget.producto?.categoria,
-                  readOnly: _bloqueado, // <--- Bloqueo
+                  initialValue: _categoria,
+                  readOnly: _bloqueado,
                   decoration: const InputDecoration(labelText: "Categoría *", border: OutlineInputBorder()),
-                  validator: (v) => v!.isEmpty ? "Campo obligatorio" : null,
-                  onSaved: (v) => _categoria = v!,
+                  validator: (v) => v == null || v.isEmpty ? "La categoría es obligatoria" : null,
+                  onChanged: (v) => _categoria = v,
                 ),
                 const SizedBox(height: 15),
+
+                // DESCRIPCIÓN
                 TextFormField(
-                  initialValue: widget.producto?.descripcion,
-                  readOnly: _bloqueado, // <--- Bloqueo
+                  initialValue: _descripcion,
+                  readOnly: _bloqueado,
                   decoration: const InputDecoration(labelText: "Descripción (Opcional)", border: OutlineInputBorder()),
-                  maxLines: 3,
-                  onSaved: (v) => _descripcion = v ?? "",
+                  maxLines: 2,
+                  onChanged: (v) => _descripcion = v,
                 ),
+                
                 const SizedBox(height: 30),
-                if (!_bloqueado) // Solo mostrar botón si no está bloqueado
+                
+                // BOTÓN DE GUARDAR
+                if (!_bloqueado)
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 55,
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green, 
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                      ),
                       onPressed: _saveForm,
-                      child: const Text("GUARDAR CAMBIOS", style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text("GUARDAR PRODUCTO", 
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   )
               ],
@@ -110,23 +162,33 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   }
 
   void _saveForm() {
+    // 1. Validar que los campos obligatorios estén llenos
     if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
+      
       final p = Producto(
         id: widget.producto?.id,
-        nombre: _nombre,
+        nombre: _nombre.trim(),
         precio: _precio,
-        categoria: _categoria,
-        descripcion: _descripcion,
+        categoria: _categoria.trim(),
+        descripcion: _descripcion.trim(),
+        codigoBarras: _codigoBarras?.trim(),
         fechaCreacion: widget.producto?.fechaCreacion ?? DateTime.now(),
       );
 
+      // 2. Guardar usando el Provider
       if (widget.producto == null) {
         context.read<ProductProvider>().addProducto(p);
       } else {
         context.read<ProductProvider>().updateProducto(p);
       }
+
+      // 3. Cerrar la pantalla
       Navigator.pop(context);
+      
+      // 4. Mostrar mensaje de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Producto guardado correctamente"), backgroundColor: Colors.green),
+      );
     }
   }
 }

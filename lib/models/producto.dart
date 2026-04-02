@@ -4,6 +4,7 @@ class Producto {
   double precio;
   String categoria;
   String? descripcion;
+  String? codigoBarras;
   DateTime fechaCreacion;
 
   Producto({
@@ -12,10 +13,10 @@ class Producto {
     required this.precio,
     required this.categoria,
     this.descripcion,
+    this.codigoBarras,
     required this.fechaCreacion,
   });
 
-  // Convertir a Map para la base de datos
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -23,11 +24,11 @@ class Producto {
       'precio': precio,
       'categoria': categoria,
       'descripcion': descripcion,
+      'codigoBarras': codigoBarras,
       'fechaCreacion': fechaCreacion.toIso8601String(),
     };
   }
 
-  // Crear objeto desde Map
   factory Producto.fromMap(Map<String, dynamic> map) {
     return Producto(
       id: map['id'],
@@ -35,6 +36,7 @@ class Producto {
       precio: map['precio'],
       categoria: map['categoria'],
       descripcion: map['descripcion'],
+      codigoBarras: map['codigoBarras'],
       fechaCreacion: DateTime.parse(map['fechaCreacion']),
     );
   }
