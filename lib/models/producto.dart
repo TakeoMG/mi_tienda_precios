@@ -5,6 +5,7 @@ class Producto {
   String categoria;
   String? descripcion;
   String? codigoBarras;
+  String? imagenPath; // <--- Nuevo campo
   DateTime fechaCreacion;
 
   Producto({
@@ -14,6 +15,7 @@ class Producto {
     required this.categoria,
     this.descripcion,
     this.codigoBarras,
+    this.imagenPath,
     required this.fechaCreacion,
   });
 
@@ -25,6 +27,7 @@ class Producto {
       'categoria': categoria,
       'descripcion': descripcion,
       'codigoBarras': codigoBarras,
+      'imagenPath': imagenPath,
       'fechaCreacion': fechaCreacion.toIso8601String(),
     };
   }
@@ -37,6 +40,7 @@ class Producto {
       categoria: map['categoria'],
       descripcion: map['descripcion'],
       codigoBarras: map['codigoBarras'],
+      imagenPath: map['imagenPath'],
       fechaCreacion: DateTime.parse(map['fechaCreacion']),
     );
   }
