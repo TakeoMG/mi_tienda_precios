@@ -5,9 +5,11 @@ Una aplicación móvil moderna, rápida y profesional diseñada para el control 
 ---
 
 ##  Características Principales
-| Pantalla de Inicio | Módulo de Caja (Scanner) | Detalle de Producto | Metodo de filtrado de productos | Panel |
-| :---: | :---: | :---: |
-| <img src="screenshots/home.png" width="200"> | <img src="screenshots/caja.png" width="200"> | <img src="screenshots/editar.png" width="200"> | <img src="screenshots/filtro.png" width="200"> | <img src="screenshots/panel.png" width="200"> |
+
+| Inicio | Caja (Scanner) | Detalle | Filtro | Panel |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="screenshots/home.jpeg" width="160"> | <img src="screenshots/caja.jpeg" width="160"> | <img src="screenshots/editar.jpeg" width="160"> | <img src="screenshots/filtro.jpeg" width="160"> | <img src="screenshots/panel.jpeg" width="160"> |
+
 ###  Gestión de Inventario Local
 - **Persistencia Total:** Base de datos local con `sqflite` (funciona 100% offline).
 - **Detalles del Producto:** Nombre, Categoría, Descripción, Precio y **Código de Barras**.
