@@ -8,33 +8,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../database/database_helper.dart';
 import '../models/producto.dart';
 import '../models/carrito_item.dart';
+import '../utils/translations.dart';
 
 class ProductProvider with ChangeNotifier {
   List<Producto> _items = [];
   List<Producto> _filteredItems = [];
   bool _isLoading = false;
   bool _mostrarImagenes = false;
-  bool _esPrimeraVez = true;
+  bool _esPrimeraVez = true; 
+  String _idioma = 'en';
 
   final Set<int> _selectedIds = {}; 
   Set<int> get selectedIds => _selectedIds;
   bool get isSelectionMode => _selectedIds.isNotEmpty;
   bool get mostrarImagenes => _mostrarImagenes;
   bool get esPrimeraVez => _esPrimeraVez;
-
+  String get idioma => _idioma;
   List<Producto> get items => _filteredItems;
   bool get isLoading => _isLoading;
 
-  ProductProvider() {
-    fetchProductos();
-    _cargarPreferencias();
-  }
+  ProductProvider() { _cargarPreferencias(); }
 
-  // --- PREFERENCIAS (FOTOS Y TUTORIAL) ---
-  void _cargarPreferencias() async {
+  String tr(String key) => AppTexts.values[_idioma]?[key] ?? key;
+
+  Future<void> _cargarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
     _mostrarImagenes = prefs.getBool('mostrarImagenes') ?? false;
     _esPrimeraVez = prefs.getBool('esPrimeraVez') ?? true;
+    _idioma = prefs.getString('idioma') ?? 'en';
+    await fetchProductos();
+    notifyListeners();
+  }
+
+  void toggleIdioma() async {
+    _idioma = (_idioma == 'en') ? 'es' : 'en';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('idioma', _idioma);
     notifyListeners();
   }
 
@@ -45,15 +54,15 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void finalizarTutorial() async {
+  Future<void> finalizarTutorial() async {
     _esPrimeraVez = false;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('esPrimeraVez', false);
+    await prefs.setBool('esPrimeraVez', false); 
     notifyListeners();
   }
 
-  // --- LÓGICA DE CAJA ---
-  List<CarritoItem> _carrito = [];
+  // --- CARRITO ---
+  final List<CarritoItem> _carrito = [];
   List<CarritoItem> get carrito => _carrito;
   double get totalCarrito => _carrito.fold(0, (sum, item) => sum + item.subtotal);
 
@@ -101,7 +110,6 @@ class ProductProvider with ChangeNotifier {
     else { _selectedIds.add(id); }
     notifyListeners();
   }
-
   void clearSelection() { _selectedIds.clear(); notifyListeners(); }
   void selectAllFiltered() { for (var p in _filteredItems) { if (p.id != null) _selectedIds.add(p.id!); } notifyListeners(); }
 
@@ -111,9 +119,8 @@ class ProductProvider with ChangeNotifier {
     await fetchProductos();
   }
 
-  Future<void> addProducto(Producto producto) async { await DatabaseHelper.instance.create(producto); await fetchProductos(); }
-  Future<void> updateProducto(Producto producto) async { await DatabaseHelper.instance.update(producto); await fetchProductos(); }
-  Future<void> deleteProducto(int id) async { await DatabaseHelper.instance.delete(id); await fetchProductos(); }
+  Future<void> addProducto(Producto p) async { await DatabaseHelper.instance.create(p); await fetchProductos(); }
+  Future<void> updateProducto(Producto p) async { await DatabaseHelper.instance.update(p); await fetchProductos(); }
   Future<void> clearAll() async { await DatabaseHelper.instance.deleteAll(); await fetchProductos(); }
 
   Future<String> exportToCSV() async {
@@ -131,23 +138,15 @@ class ProductProvider with ChangeNotifier {
       if (result != null) {
         File file = File(result.files.single.path!);
         String content;
-        try { content = await file.readAsString(encoding: utf8); } 
-        catch (e) { content = await file.readAsString(encoding: latin1); }
+        try { content = await file.readAsString(encoding: utf8); } catch (e) { content = await file.readAsString(encoding: latin1); }
         List<String> lines = content.split('\n');
         for (int i = 1; i < lines.length; i++) {
           if (lines[i].trim().isEmpty) continue;
-          List<String> columns = lines[i].split(',');
-          if (columns.length >= 3) {
-            Producto nuevo = Producto(
-              nombre: columns[0].trim(),
-              precio: double.tryParse(columns[1].trim()) ?? 0.0,
-              categoria: columns[2].trim(),
-              descripcion: columns.length > 3 ? columns[3].trim() : "",
-              fechaCreacion: DateTime.now(),
-            );
-            Producto? existe = await DatabaseHelper.instance.getProductoByNombre(nuevo.nombre);
-            if (existe != null) { nuevo.id = existe.id; await DatabaseHelper.instance.update(nuevo); } 
-            else { await DatabaseHelper.instance.create(nuevo); }
+          List<String> col = lines[i].split(',');
+          if (col.length >= 3) {
+            Producto n = Producto(nombre: col[0].trim(), precio: double.tryParse(col[1].trim()) ?? 0.0, categoria: col[2].trim(), descripcion: col.length > 3 ? col[3].trim() : "", fechaCreacion: DateTime.now());
+            Producto? ex = await DatabaseHelper.instance.getProductoByNombre(n.nombre);
+            if (ex != null) { n.id = ex.id; await DatabaseHelper.instance.update(n); } else { await DatabaseHelper.instance.create(n); }
           }
         }
         await fetchProductos();
