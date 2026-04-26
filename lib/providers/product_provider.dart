@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // <--- Nueva
+import 'package:shared_preferences/shared_preferences.dart';
 import '../database/database_helper.dart';
 import '../models/producto.dart';
 import '../models/carrito_item.dart';
@@ -13,25 +13,28 @@ class ProductProvider with ChangeNotifier {
   List<Producto> _items = [];
   List<Producto> _filteredItems = [];
   bool _isLoading = false;
-  bool _mostrarImagenes = false; // <--- Estado opcional
+  bool _mostrarImagenes = false;
+  bool _esPrimeraVez = true;
 
   final Set<int> _selectedIds = {}; 
   Set<int> get selectedIds => _selectedIds;
   bool get isSelectionMode => _selectedIds.isNotEmpty;
   bool get mostrarImagenes => _mostrarImagenes;
+  bool get esPrimeraVez => _esPrimeraVez;
 
   List<Producto> get items => _filteredItems;
   bool get isLoading => _isLoading;
 
   ProductProvider() {
     fetchProductos();
-    _cargarPreferenciaImagenes();
+    _cargarPreferencias();
   }
 
-  // --- LÓGICA DE PREFERENCIAS ---
-  void _cargarPreferenciaImagenes() async {
+  // --- PREFERENCIAS (FOTOS Y TUTORIAL) ---
+  void _cargarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
     _mostrarImagenes = prefs.getBool('mostrarImagenes') ?? false;
+    _esPrimeraVez = prefs.getBool('esPrimeraVez') ?? true;
     notifyListeners();
   }
 
@@ -39,6 +42,13 @@ class ProductProvider with ChangeNotifier {
     _mostrarImagenes = valor;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('mostrarImagenes', valor);
+    notifyListeners();
+  }
+
+  void finalizarTutorial() async {
+    _esPrimeraVez = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('esPrimeraVez', false);
     notifyListeners();
   }
 
@@ -62,7 +72,7 @@ class ProductProvider with ChangeNotifier {
 
   void limpiarCarrito() { _carrito.clear(); notifyListeners(); }
 
-  // --- CRUD Y BUSQUEDA ---
+  // --- CRUD ---
   Future<void> fetchProductos() async {
     _isLoading = true;
     _items = await DatabaseHelper.instance.readAllProductos();
